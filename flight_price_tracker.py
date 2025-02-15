@@ -79,11 +79,11 @@ def get_flight_price(origin, destination, date):
         return None, None
     
     params = {
-        "date": date,
-        "origin": origin,
-        "originId": origin_id,
-        "destination": destination,
-        "destinationId": destination_id,
+        "date": 28/07/2025,
+        "origin": AMS,
+        "originId": 95565044,
+        "destination": DSP,
+        "destinationId": 95673809,
         "cabinClass": "economy",
         "adults": "1",
         "children": "0",
