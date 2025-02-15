@@ -23,24 +23,7 @@ API_HEADERS = {
     "x-rapidapi-key": "75068b0d81msh6f2ac0750ffe789p1edffejsn99091da45b17"
 }
 
-# Websites voor web scraping
-FLIGHT_WEBSITES = [
-    "https://www.skyscanner.nl",
-    "https://www.kayak.nl",
-    "https://www.google.com/flights",
-    "https://www.expedia.nl",
-    "https://www.cheaptickets.nl",
-    "https://www.momondo.nl",
-    "https://www.orbitz.com",
-    "https://www.priceline.com",
-    "https://www.travelocity.com",
-    "https://www.hotwire.com",
-    "https://www.edreams.com",
-    "https://www.opodo.com",
-    "https://www.justfly.com",
-    "https://www.trip.com",
-    "https://www.vliegtickets.nl"
-]
+AUTO_COMPLETE_URL = "https://skyscanner89.p.rapidapi.com/flights/auto-complete"
 
 # Vluchtdata instellingen
 FLIGHTS = [
@@ -68,20 +51,51 @@ def create_database():
     conn.commit()
     conn.close()
 
+# Ophalen van locatie-ID's
+def get_location_id(location_code):
+    """Haalt de Skyscanner locatie-ID op voor een luchthaven."""
+    params = {"query": location_code}
+    try:
+        response = requests.get(AUTO_COMPLETE_URL, headers=API_HEADERS, params=params)
+        response.raise_for_status()
+        data = response.json()
+        if "data" in data and len(data["data"]) > 0:
+            location_id = data["data"][0]["entityId"]
+            st.write(f"Locatie-ID voor {location_code}: {location_id}")
+            return location_id
+        else:
+            st.error(f"Geen locatie-ID gevonden voor {location_code}")
+            return None
+    except requests.exceptions.RequestException as e:
+        st.error(f"API-fout bij ophalen locatie-ID: {e}")
+        return None
+
 # Ophalen van vluchtprijzen via API
 def get_flight_price(origin, destination, date):
+    """Haalt vluchtprijzen op met de correcte locatie-ID's."""
+    origin_id = get_location_id(origin)
+    destination_id = get_location_id(destination)
+    if not origin_id or not destination_id:
+        return None, None
+    
     params = {
-        "from": origin,
-        "to": destination,
         "date": date,
-        "currency": "EUR",
-        "language": "en"
+        "origin": origin,
+        "originId": origin_id,
+        "destination": destination,
+        "destinationId": destination_id,
+        "cabinClass": "economy",
+        "adults": "1",
+        "children": "0",
+        "infants": "0",
+        "locale": "en-US",
+        "market": "NL",
+        "currency": "EUR"
     }
     try:
         response = requests.get(API_URL, headers=API_HEADERS, params=params)
         response.raise_for_status()
         data = response.json()
-
         if "data" in data and len(data["data"]) > 0:
             min_price = data["data"][0]["price"]
             return min_price, "Skyscanner API"
@@ -109,7 +123,7 @@ def check_and_store_price(origin, destination, date):
     last_price = c.fetchone()
     
     if last_price and abs(last_price[0] - price) >= 50:
-        send_alerts(origin, destination, date, last_price[0], price)
+        st.warning(f"Prijsverandering voor {origin} -> {destination}: van €{last_price[0]} naar €{price}")
     
     c.execute("INSERT INTO prices (origin, destination, date, price, source, checked_at) VALUES (?, ?, ?, ?, ?, ?)",
               (origin, destination, date, price, source, datetime.now()))
@@ -146,9 +160,15 @@ def main():
     create_database()
     for flight in FLIGHTS:
         check_and_store_price(flight["origin"], flight["destination"], flight["date"])
-    
     plot_price_trends()
 
 if __name__ == "__main__":
     main()
+
+if st.button("Test locatie-ID ophalen"):
+    st.write("Ophalen van locatie-ID’s...")
+    get_location_id("AMS")  # Amsterdam
+    get_location_id("DPS")  # Bali
+    get_location_id("DEN")  # Denver
+
 
