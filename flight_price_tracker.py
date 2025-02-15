@@ -16,9 +16,12 @@ TWILIO_AUTH_TOKEN = "YOUR_TWILIO_AUTH_TOKEN"
 TWILIO_PHONE_NUMBER = "YOUR_TWILIO_PHONE_NUMBER"
 RECIPIENT_PHONE_NUMBER = "YOUR_PHONE_NUMBER"
 
-# Skyscanner API instellingen (gebruik een API-key van RapidAPI)
-API_KEY = "YOUR_API_KEY"
-API_URL = "https://partners.api.skyscanner.net/apiservices/browseroutes/v1.0/NL/EUR/en-US/{origin}/{destination}/{date}?apiKey=" + API_KEY
+# Skyscanner API instellingen
+API_URL = "https://skyscanner89.p.rapidapi.com/flights/one-way/list"
+API_HEADERS = {
+    "x-rapidapi-host": "skyscanner89.p.rapidapi.com",
+    "x-rapidapi-key": "75068b0d81msh6f2ac0750ffe789p1edffejsn99091da45b17"
+}
 
 # Websites voor web scraping
 FLIGHT_WEBSITES = [
@@ -67,43 +70,37 @@ def create_database():
 
 # Ophalen van vluchtprijzen via API
 def get_flight_price(origin, destination, date):
-    url = API_URL.format(origin=origin, destination=destination, date=date)
-    response = requests.get(url)
-    data = response.json()
-    
-    if "Quotes" in data and data["Quotes"]:
-        return data["Quotes"][0]["MinPrice"], "Skyscanner API"
-    return None, None
+    params = {
+        "from": origin,
+        "to": destination,
+        "date": date,
+        "currency": "EUR",
+        "language": "en"
+    }
+    try:
+        response = requests.get(API_URL, headers=API_HEADERS, params=params)
+        response.raise_for_status()
+        data = response.json()
 
-# Scraping van vluchtprijzen
-def scrape_flight_prices():
-    prices = []
-    headers = {"User-Agent": "Mozilla/5.0"}
-    for site in FLIGHT_WEBSITES:
-        try:
-            response = requests.get(site, headers=headers, timeout=10)
-            soup = BeautifulSoup(response.text, "html.parser")
-            price_tag = soup.find(class_="price")  # Dit is een placeholder, CSS-selectors verschillen per site
-            
-            if price_tag:
-                price = int(price_tag.text.replace("€", "").replace(",", ""))
-                prices.append((site, price))
-        except Exception as e:
-            print(f"Fout bij scrapen van {site}: {e}")
-    return prices
+        if "data" in data and len(data["data"]) > 0:
+            min_price = data["data"][0]["price"]
+            return min_price, "Skyscanner API"
+        else:
+            st.error(f"Geen prijsgegevens gevonden voor {origin} -> {destination} op {date}")
+            return None, None
+    except requests.exceptions.RequestException as e:
+        st.error(f"API-fout: {e}")
+        return None, None
+    except requests.exceptions.JSONDecodeError:
+        st.error("Fout bij het decoderen van API-response. Mogelijk ongeldige API-key of limiet bereikt.")
+        return None, None
 
 # Opslaan en vergelijken van prijzen
 def check_and_store_price(origin, destination, date):
     price, source = get_flight_price(origin, destination, date)
     if price is None:
-        scraped_prices = scrape_flight_prices()
-        for site, scraped_price in scraped_prices:
-            store_price(origin, destination, date, scraped_price, site)
-    else:
-        store_price(origin, destination, date, price, source)
-
-# Opslag in database
-def store_price(origin, destination, date, price, source):
+        return
+    
     conn = sqlite3.connect(DB_NAME)
     c = conn.cursor()
     
@@ -154,3 +151,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
