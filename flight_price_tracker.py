@@ -23,7 +23,11 @@ API_HEADERS = {
     "x-rapidapi-key": "75068b0d81msh6f2ac0750ffe789p1edffejsn99091da45b17"
 }
 
-AUTO_COMPLETE_URL = "https://skyscanner89.p.rapidapi.com/flights/auto-complete"
+# Correcte locatie-ID's voor AMS en DPS
+LOCATION_IDS = {
+    "AMS": "95565044",  # Amsterdam Schiphol
+    "DPS": "95673809"   # Denpasar (Bali)
+}
 
 # Vluchtdata instellingen
 FLIGHTS = [
@@ -51,44 +55,26 @@ def create_database():
     conn.commit()
     conn.close()
 
-# Ophalen van locatie-ID's
-def get_location_id(location_code):
-    """Haalt de Skyscanner locatie-ID op voor een luchthaven."""
-    params = {"query": location_code}
-    try:
-        response = requests.get(AUTO_COMPLETE_URL, headers=API_HEADERS, params=params)
-        response.raise_for_status()
-        data = response.json()
-        if "data" in data and len(data["data"]) > 0:
-            location_id = data["data"][0]["entityId"]
-            st.write(f"Locatie-ID voor {location_code}: {location_id}")
-            return location_id
-        else:
-            st.error(f"Geen locatie-ID gevonden voor {location_code}")
-            return None
-    except requests.exceptions.RequestException as e:
-        st.error(f"API-fout bij ophalen locatie-ID: {e}")
-        return None
-
 # Ophalen van vluchtprijzen via API
 def get_flight_price(origin, destination, date):
     """Haalt vluchtprijzen op met de correcte locatie-ID's."""
-    origin_id = get_location_id(origin)
-    destination_id = get_location_id(destination)
+    origin_id = LOCATION_IDS.get(origin)
+    destination_id = LOCATION_IDS.get(destination)
     if not origin_id or not destination_id:
+        st.error(f"Geen locatie-ID gevonden voor {origin} of {destination}")
         return None, None
     
     params = {
-        "date": "28-07-2025",
-        "origin": AMS,
-        "originId": 95565044,
-        "destination": DSP,
-        "destinationId": 95673809,
+        "date": date,
+        "origin": origin,
+        "originId": origin_id,
+        "destination": destination,
+        "destinationId": destination_id,
         "cabinClass": "economy",
         "adults": "1",
         "children": "0",
         "infants": "0",
-        "locale": "en-US",
+        "locale": "nl-NL",
         "market": "NL",
         "currency": "EUR"
     }
@@ -164,11 +150,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-if st.button("Test locatie-ID ophalen"):
-    st.write("Ophalen van locatie-ID’s...")
-    get_location_id("AMS")  # Amsterdam
-    get_location_id("DPS")  # Bali
-    get_location_id("DEN")  # Denver
-
-
