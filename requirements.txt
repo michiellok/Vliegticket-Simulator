@@ -2,6 +2,5 @@ streamlit
 requests
 pandas
 matplotlib
-sqlite3
 beautifulsoup4
 twilio
