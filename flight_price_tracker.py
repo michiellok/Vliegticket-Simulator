@@ -82,6 +82,10 @@ def get_flight_price(origin, destination, date):
         response = requests.get(API_URL, headers=API_HEADERS, params=params)
         response.raise_for_status()
         data = response.json()
+        
+        # 🛠 DEBUG: Laat de volledige API-response zien in Streamlit
+        st.write(f"API-respons ontvangen: {data}")
+
         if "data" in data and len(data["data"]) > 0:
             min_price = data["data"][0]["price"]
             return min_price, "Skyscanner API"
