@@ -3,12 +3,14 @@ import time
 import smtplib
 import pandas as pd
 import streamlit as st
+import requests
+from bs4 import BeautifulSoup
 from email.mime.text import MIMEText
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.service import Service
-from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.chrome.options import Options
+from webdriver_manager.chrome import ChromeDriverManager
 
 # Notificatie instellingen
 EMAIL_SENDER = "jouw-email@gmail.com"
@@ -47,24 +49,22 @@ options.add_argument("--disable-dev-shm-usage")
 service = Service(ChromeDriverManager().install())
 driver = webdriver.Chrome(service=service, options=options)
 
-# Scraper functie
 def scrape_flight_prices():
     results = []
     for site_name, site_url in SCRAPE_SITES.items():
         try:
-            driver.get(site_url)
-            time.sleep(5)  # Wachten tot de pagina geladen is
-            
+            response = requests.get(site_url, headers={"User-Agent": "Mozilla/5.0"})
+            soup = BeautifulSoup(response.text, 'html.parser')
+            prices = []
+
             if "skyscanner" in site_url:
-                prices = driver.find_elements(By.CLASS_NAME, "BpkText_bpk-text__NjFjy")  # Aanpassen voor echte selector
+                prices = soup.find_all(class_="BpkText_bpk-text__NjFjy")
             elif "google" in site_url:
-                prices = driver.find_elements(By.CLASS_NAME, "YMlKec")
+                prices = soup.find_all(class_="YMlKec")
             elif "kayak" in site_url:
-                prices = driver.find_elements(By.CLASS_NAME, "price-text")
+                prices = soup.find_all(class_="price-text")
             elif "momondo" in site_url:
-                prices = driver.find_elements(By.CLASS_NAME, "ticket-price")
-            else:
-                prices = []
+                prices = soup.find_all(class_="ticket-price")
             
             extracted_prices = [int(p.text.replace("€", "").replace(",", "")) for p in prices if p.text]
             if extracted_prices:
@@ -74,18 +74,16 @@ def scrape_flight_prices():
             print(f"Error scraping {site_name}: {e}")
     return results
 
-# Notificatie functie
 def send_email_notification(message):
     msg = MIMEText(message)
     msg['Subject'] = "Goedkope vlucht gevonden!"
     msg['From'] = EMAIL_SENDER
     msg['To'] = EMAIL_RECEIVER
-
+    
     with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
         server.login(EMAIL_SENDER, EMAIL_PASSWORD)
         server.sendmail(EMAIL_SENDER, EMAIL_RECEIVER, msg.as_string())
 
-# Hoofdscript
 def main():
     st.title("Flight Price Tracker")
     results = scrape_flight_prices()
@@ -102,6 +100,6 @@ def main():
 
 if __name__ == "__main__":
     main()
-    driver.quit()
+
 
 
