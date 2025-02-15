@@ -1,6 +1,4 @@
-streamlit
-requests
+selenium
+webdriver-manager
 pandas
-matplotlib
-beautifulsoup4
-twilio
+streamlit
